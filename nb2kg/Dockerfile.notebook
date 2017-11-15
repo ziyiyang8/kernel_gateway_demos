@@ -1,10 +1,52 @@
-# Copyright (c) Jupyter Development Team.
-# Distributed under the terms of the Modified BSD License.
+# A base Ubuntu 16.04 build that runs on z #
+FROM s390x/debian:jessie-slim
+USER root
 
-FROM jupyter/minimal-notebook:fa77fe99579b
+# Build Minimal Notebook #
+## Install Dependencies ##
+RUN apt-get update
+RUN apt-get install -y python-pip python-dev
+RUN apt-get clean
+RUN rm -rf /var/lib/apt/lists/*
 
-# Do the pip installs as the unprivileged notebook user
-USER jovyan
+## Set Environment Variables ##
+RUN locale-gen en_US.UTF-8
+ENV CONDA_DIR=/opt/conda
+ENV PATH=$CONDA_DIR/bin:$PATH
+ENV SHELL=/bin/bash
+ENV NB_USER=jovyan
+ENV NB_UID=1000
+ENV LC_ALL=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US.UTF-8
+ENV DEBIAN_FRONTEND noninteractive
+ENV PATH=$PATH:/home/$NB_USER/.local/bin
+
+## Create User $NB_USER with UID=1000 ##
+RUN useradd -m -s /bin/bash -N -u $NB_UID $NB_USER
+RUN mkdir -p /opt/conda
+RUN chown $NB_USER /opt/conda 
+RUN chown $NB_USER -R /usr/
+
+USER $NB_USER
+RUN mkdir /home/$NB_USER/work
+RUN mkdir /home/$NB_USER/.jupyter
+RUN mkdir /home/$NB_USER/.local
+
+USER root
+RUN cd /tmp
+RUN pip install --upgrade pip
+RUN pip install 'notebook==4.3'
+RUN pip install 'jupyterhub==0.7'
+
+COPY /files/start.sh /usr/local/bin/
+COPY /files/start-notebook.sh /usr/local/bin/
+COPY /files/start-singleuser.sh /usr/local/bin/
+COPY /files/jupyter_notebook_config.py /home/$NB_USER/.jupyter/
+RUN chown -R $NB_USER:users /home/$NB_USER/.jupyter
+
+WORKDIR /home/$NB_USER/work
+USER $NB_USER
 
 # Install dashboard layout and preview within Jupyter Notebook
 ADD . /src
